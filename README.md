@@ -11,21 +11,33 @@ during World War I in 1918.
 
 Installation
 ------------
-Installation is not required. However, the
-[tweepy](https://github.com/tweepy/tweepy) library is required to run the
-classifier.
+Installation is not required. However, the following dependencies are required
+to run the classifier:
+
+ * [tweepy](https://github.com/tweepy/tweepy), a library for Twitter
+ * [iso8601](https://pypi.python.org/pypi/iso8601/), a library to parse ISO 8601
+   formatted dates
 
 Configuration
 -------------
-One needs to be registered on [Twitter Developers](https://dev.twitter.com/) in
-order to obtain the required information:
+The training set is provided as a file.
+
+There are sources where tweets can be obtained:
+
+ * Link (A status link is supplied)
+ * Twitter (Uses Twitter's Streaming API)
+ * File (Uses JSON data from a file)
+
+To use Twitter's Streaming API, one needs to be registered on
+[Twitter Developers](https://dev.twitter.com/) in order to obtain the required
+information:
 
  * OAuth consumer key
  * OAuth consumer secret
  * OAuth access token key
  * OAuth access token secret
 
-Once you have the above information, modify `cherami/config.py` accordingly.
+Modify `cherami/config.py` accordingly.
 
 Running
 -------
