@@ -37,7 +37,8 @@ information:
  * OAuth access token key
  * OAuth access token secret
 
-Modify `cherami/config.py` accordingly.
+Copy `cherami/config.py.default` to `cherami/config.py` and modify
+`cherami/config.py` accordingly.
 
 Running
 -------
