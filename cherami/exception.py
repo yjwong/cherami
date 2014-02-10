@@ -17,4 +17,7 @@ class ConfigException(CheramiException):
 class CommandLineException(CheramiException):
     pass
 
+class UnknownStopwordSourceException(CheramiException):
+    pass
+
 # vim: set ts=4 sw=4 et:

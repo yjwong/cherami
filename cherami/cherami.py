@@ -6,6 +6,7 @@
 
 import sys
 import urlparse
+import logging
 
 import tweepy
 import config
@@ -15,12 +16,19 @@ from stream import TweetFileStream
 from exception import CommandLineException
 from exception import ConfigException
 
+logger = logging.getLogger(__name__)
+
 def main():
+    # Initialize logging.
+    logging.basicConfig(level=logging.INFO)
+
     # Initialize a classifier.
     classifier = BaseClassifier()
 
     # Determine the tweet source to use.
+    logger.info('Using tweet source "{0}".'.format(config.tweet_source))
     if config.tweet_source == "file":
+        logger.info('Loading tweets from "{0}"...'.format(config.tweet_file))
         streamer = TweetFileStream(config.tweet_file, classifier)
         streamer.filter(track=["twitter"])
     
@@ -37,15 +45,16 @@ def main():
         url_info = urlparse.urlsplit(sys.argv[1])
         status_id = url_info.path.rsplit("/", 1)[1]
 
+        logger.info('Retrieving link: {0}'.format(sys.argv[1]))
         api = tweepy.API(auth, parser=tweepy.parsers.RawParser())
         result = api.get_status(status_id)
         classifier.on_data(result)
 
-    elif config.tweet_source == "twitter" or \
-         config.tweet_source == "link":
+    elif config.tweet_source == "twitter":
         auth = tweepy.OAuthHandler(config.oauth_consumer_key, config.oauth_consumer_secret)
         auth.set_access_token(config.oauth_token_key, config.oauth_token_secret)
 
+        logger.info('Connecting to Twitter Streaming API...')
         streamer = tweepy.Stream(auth, classifier)
         streamer.filter(track=["twitter"])
 
