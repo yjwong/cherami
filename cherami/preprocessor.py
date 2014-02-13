@@ -20,20 +20,32 @@ from exception import UnknownStopwordSourceException
 logger = logging.getLogger(__name__)
 
 class TweetTokenizer:
+    """An interface for a tokenizer for a tweet."""
+
     def tokenize(self, tweet):
         raise NotImplementedError()
 
 class SimpleTokenizer(TweetTokenizer):
+    """A simple string-based tokenizer that implements TweetTokenizer.""" 
+
     def tokenize(self, tweet):
-        tokens = tweet.split()
-        return [i.lower() for i in tokens]
+        return tweet.split()
 
 class TweetTextFilter:
+    """
+    A text filter for tweets.
+
+    Removes redundant information such as mentions, links and symbols from the
+    tweet body. In addition, HTML entities are converted into their normal
+    forms and the entire tweet body is converted to lowercase.
+    """
+
     def filter(self, text):
         text = self.remove_mentions(text)
         text = self.remove_links(text)
         text = self.remove_symbols(text)
         text = self.convert_entities(text)
+        text = self.convert_case(text)
         return text
 
     def remove_mentions(self, text):
@@ -49,7 +61,21 @@ class TweetTextFilter:
         parser = HTMLParser.HTMLParser()
         return parser.unescape(text)
 
+    def convert_case(self, text):
+        return text.lower()
+
 class StopwordRemover:
+    """
+    A stopword remover.
+
+    Removes words that are extremely common and/or do not provide strong
+    significance to the meaning/topic suggested by the tweet. The old-style
+    RTs are removed, along with words appearing in NLTK's stopword list.
+    Tokens containing only numbers are also removed.
+
+    TODO: Language detection.
+    """
+
     def __init__(self):
         self.stopword_list = set()
 
