@@ -145,4 +145,24 @@ class StopwordRemover:
         if tempdir is not None:
             shutil.rmtree(tempdir)
 
+class VocabNormalizer:
+    def __init__(self):
+        self.vocab_map = dict()
+
+    def normalize(self, terms):
+        for i in range(len(terms)):
+            if terms[i] in self.vocab_map:
+                terms[i] = self.vocab_map[terms[i]]
+
+        return terms
+
+    def build_map(self):
+        source = config.vocab_map_file
+        f = open(source, 'r')
+        for line in f:
+            key, value = line.split()
+            key = key.strip()
+            value = value.strip()
+            self.vocab_map[key] = value
+
 # vim: set ts=4 sw=4 et:

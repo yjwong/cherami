@@ -6,8 +6,14 @@
 
 # Path to the training set of tweets.
 
-# Path to the stop word list.
-stopword_file = "./dataset/stopwords.txt"
+# Stopword sources, in order.
+stopword_sources = [
+    'nltk:english',
+    'file:./dataset/stopwords.smartdatacollective.com.txt'
+]
+
+# Path to a vocabulary normalization map.
+vocab_map = './dataset/normalization_map.emnlp.txt'
 
 # Should we classify tweets from an actual source, or from a file?
 # tweet_source = "twitter"
