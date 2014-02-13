@@ -8,6 +8,7 @@ import tweepy
 
 from preprocessor import StopwordRemover
 from preprocessor import SimpleTokenizer
+from preprocessor import TweetTextFilter
 
 class BaseClassifier(tweepy.StreamListener):
     def __init__(self):
@@ -20,10 +21,15 @@ class BaseClassifier(tweepy.StreamListener):
         return False
 
     def on_status(self, status):
+        # Filter out links and mentions first.
+        text_filter = TweetTextFilter()
+        print status.text
+        text = text_filter.filter(status.text)
+
+        # Tokenize the text.
         tokenizer = SimpleTokenizer()
-        tokens = tokenizer.tokenize(status.text)
-        tokens = self.remover.remove(tokens)
-        tokens = self.remover.remove_mentions(tokens)
-        print(tokens)
+        tokens = tokenizer.tokenize(text)
+        tokens = self.remover.remove_all(tokens)
+        print tokens
 
 # vim: set ts=4 sw=4 et:

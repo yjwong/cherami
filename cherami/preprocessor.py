@@ -4,9 +4,11 @@
 # Assignment 1
 # See LICENSE for details
 
+import re
 import logging
 import tempfile
 import shutil
+import HTMLParser
 
 import nltk
 from nltk.corpus import stopwords
@@ -23,17 +25,56 @@ class TweetTokenizer:
 
 class SimpleTokenizer(TweetTokenizer):
     def tokenize(self, tweet):
-        return tweet.split()
+        tokens = tweet.split()
+        return [i.lower() for i in tokens]
+
+class TweetTextFilter:
+    def filter(self, text):
+        text = self.remove_mentions(text)
+        text = self.remove_links(text)
+        text = self.remove_symbols(text)
+        text = self.convert_entities(text)
+        return text
+
+    def remove_mentions(self, text):
+        return re.sub('@([A-Za-z]+[A-Za-z0-9_]*)', '', text)
+
+    def remove_links(self, text):
+        return re.sub(r'https?:\/\/.*[\r\n]*', '', text)
+
+    def remove_symbols(self, text):
+        return re.sub(r'([^A-Za-z0-9\'])', ' ', text)
+
+    def convert_entities(self, text):
+        parser = HTMLParser.HTMLParser()
+        return parser.unescape(text)
 
 class StopwordRemover:
     def __init__(self):
         self.stopword_list = set()
 
+    def remove_all(self, terms, tweet=None):
+        terms = self.remove_rt(terms)
+        terms = self.remove(terms)
+        terms = self.remove_numbers(terms)
+        return terms
+
     def remove(self, terms):
         return [i for i in terms if i not in self.stopword_list]
 
-    def remove_mentions(self, terms):
-        return [i for i in terms if not i.startswith('@')]
+    def remove_rt(self, terms):
+        return [i for i in terms if not i == 'rt']
+
+    def remove_numbers(self, terms):
+        filtered_terms = list()
+        for i in terms:
+            try:
+                float(i)
+            except ValueError:
+                filtered_terms.append(i)
+                pass
+
+        return filtered_terms
 
     def build_lists(self):
         sources = config.stopword_sources
