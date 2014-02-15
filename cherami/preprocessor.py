@@ -76,8 +76,19 @@ class StopwordRemover:
     TODO: Language detection.
     """
 
+    # Keep track of references to this class so that we know when to remove
+    # the NLTK data.
+    refcnt = 0
+    nltk_dir = None
+
     def __init__(self):
+        StopwordRemover.refcnt += 1
         self.stopword_list = set()
+
+    def __del__(self):
+        StopwordRemover.refcnt -= 1
+        if StopwordRemover.nltk_dir != None and StopwordRemover.refcnt is 0:
+            shutil.rmtree(StopwordRemover.nltk_dir)
 
     def remove_all(self, terms, tweet=None):
         terms = self.remove_rt(terms)
@@ -124,26 +135,23 @@ class StopwordRemover:
 
     def build_list_from_nltk(self, lang):
         downloader = Downloader()
-        tempdir = None
+
+        # Check if NLTK data directory exists.
+        if StopwordRemover.nltk_dir == None:
+            # Create temporary directory for download
+            StopwordRemover.nltk_dir = tempfile.mkdtemp(prefix='cherami')
+            nltk.data.path = [StopwordRemover.nltk_dir]
         
         # Check if the NLTK data has already been downloaded.
         if not downloader.is_installed('stopwords'):
-            # Create temporary directory for download
-            tempdir = tempfile.mkdtemp(prefix='cherami')
             logger.info('Downloading NLTK stopword data into "{0}"'
-                '...'.format(tempdir))
+                '...'.format(StopwordRemover.nltk_dir))
 
-            downloader.download('stopwords', tempdir, True)
+            downloader.download('stopwords', StopwordRemover.nltk_dir, True)
             logger.info('NLTK stopword data downloaded.')
-
-            nltk.data.path = [tempdir]
 
         for word in stopwords.words(lang):
             self.stopword_list.add(word)
-
-        # Clean up after we're done.
-        if tempdir is not None:
-            shutil.rmtree(tempdir)
 
 class VocabNormalizer:
     def __init__(self):

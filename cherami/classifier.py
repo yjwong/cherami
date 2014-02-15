@@ -27,40 +27,38 @@ class BaseClassifier(tweepy.StreamListener):
 
         # Initialize some state.
         self.trained = False
-        self.training_data = list()
 
         super(BaseClassifier, self).__init__()
 
-    def train(self, training_file):
-        # Create some classes first 
-        text_filter = TweetTextFilter()
+    def train(self, training_param):
+        raise NotImplementedError('Train not implemented')
 
-        # Start reading from the training set.
-        f = open(training_file, 'r')
-        for line in f:
-            status = json.loads(line)
+    def set_trained(self, trained):
+        self.trained = trained
 
-            # Filter out links and mentions first.
-            text = self.text_filter.filter(status['text'])
+    def get_trained(self):
+        return self.trained
 
-            # Tokenize the text.
-            tokens = self.tokenizer.tokenize(text)
-            tokens = self.remover.remove_all(tokens)
+    def get_term_vector(self, status):
+        # Filter out links and mentions first.
+        text = self.text_filter.filter(status['text'])
 
-            # Normalize the vocabulary.
-            tokens = self.normalizer.normalize(tokens)
+        # Tokenize the text.
+        tokens = self.tokenizer.tokenize(text)
+        tokens = self.remover.remove_all(tokens)
 
-            # Create the term vector.
-            term_vector = dict()
-            for token in tokens:
-                if token in term_vector:
-                    term_vector[token] += 1
-                else:
-                    term_vector[token] = 1
-            
-            self.training_data.append(term_vector)
+        # Normalize the vocabulary.
+        tokens = self.normalizer.normalize(tokens)
 
-        self.trained = True
+        # Create the term vector.
+        term_vector = dict()
+        for token in tokens:
+            if token in term_vector:
+                term_vector[token] += 1
+            else:
+                term_vector[token] = 1
+
+        return term_vector
 
     def on_error(self, status_code):
         print "Error: " + repr(status_code)
@@ -81,10 +79,34 @@ class BaseClassifier(tweepy.StreamListener):
         # Normalize the vocabulary.
         tokens = self.normalizer.normalize(tokens)
 
+class LocalClassifier(BaseClassifier):
+    def __init__(self):
+        self.training_data = list()
+        super(LocalClassifier, self).__init__()
+
+    def train(self, training_sets):
+        print training_sets
+
 class GlobalClassifier(BaseClassifier):
     def __init__(self):
+        # Save some state.
+        self.training_data = list()
         self.df_threshold = 50
+
         super(GlobalClassifier, self).__init__()
+
+    def train(self, training_file):
+        # Create some classes first 
+        text_filter = TweetTextFilter()
+
+        # Start reading from the training set.
+        f = open(training_file, 'r')
+        for line in f:
+            status = json.loads(line)
+            term_vector = self.get_term_vector(status)
+            self.training_data.append(term_vector)
+
+        self.set_trained(True)
 
     def compute_df(self, term):
         """

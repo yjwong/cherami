@@ -12,6 +12,7 @@ import tweepy
 import config
 
 from classifier import GlobalClassifier
+from classifier import LocalClassifier
 from stream import TweetFileStream
 from exception import CommandLineException
 from exception import ConfigException
@@ -23,15 +24,18 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     # Initialize a classifier.
-    classifier = GlobalClassifier()
-    classifier.train(config.training_file)
-    print classifier.compute_df_all(True)
+    global_classifier = GlobalClassifier()
+    global_classifier.train(config.training_file)
+    print global_classifier.compute_df_all(sort=True, thresholding=True)
+
+    local_classifier = LocalClassifier()
+    local_classifier.train(config.training_sets)
 
     # Determine the tweet source to use.
     logger.info('Using tweet source "{0}".'.format(config.tweet_source))
     if config.tweet_source == "file":
         logger.info('Loading tweets from "{0}"...'.format(config.tweet_file))
-        streamer = TweetFileStream(config.tweet_file, classifier)
+        streamer = TweetFileStream(config.tweet_file, global_classifier)
         # streamer.filter(track=["twitter"])
     
     elif config.tweet_source == "link":
@@ -50,14 +54,14 @@ def main():
         logger.info('Retrieving link: {0}'.format(sys.argv[1]))
         api = tweepy.API(auth, parser=tweepy.parsers.RawParser())
         result = api.get_status(status_id)
-        classifier.on_data(result)
+        global_classifier.on_data(result)
 
     elif config.tweet_source == "twitter":
         auth = tweepy.OAuthHandler(config.oauth_consumer_key, config.oauth_consumer_secret)
         auth.set_access_token(config.oauth_token_key, config.oauth_token_secret)
 
         logger.info('Connecting to Twitter Streaming API...')
-        streamer = tweepy.Stream(auth, classifier)
+        streamer = tweepy.Stream(auth, global_classifier)
         streamer.filter(track=["twitter"])
 
     else:
