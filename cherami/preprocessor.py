@@ -41,10 +41,10 @@ class TweetTextFilter:
     """
 
     def filter(self, text):
+        text = self.convert_entities(text)
         text = self.remove_mentions(text)
         text = self.remove_links(text)
         text = self.remove_symbols(text)
-        text = self.convert_entities(text)
         text = self.convert_case(text)
         return text
 

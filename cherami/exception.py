@@ -20,4 +20,7 @@ class CommandLineException(CheramiException):
 class UnknownStopwordSourceException(CheramiException):
     pass
 
+class ClassifierNotTrainedException(CheramiException):
+    pass
+
 # vim: set ts=4 sw=4 et:

@@ -11,7 +11,7 @@ import logging
 import tweepy
 import config
 
-from classifier import BaseClassifier
+from classifier import GlobalClassifier
 from stream import TweetFileStream
 from exception import CommandLineException
 from exception import ConfigException
@@ -23,14 +23,16 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     # Initialize a classifier.
-    classifier = BaseClassifier()
+    classifier = GlobalClassifier()
+    classifier.train(config.training_file)
+    print classifier.compute_df_all(True)
 
     # Determine the tweet source to use.
     logger.info('Using tweet source "{0}".'.format(config.tweet_source))
     if config.tweet_source == "file":
         logger.info('Loading tweets from "{0}"...'.format(config.tweet_file))
         streamer = TweetFileStream(config.tweet_file, classifier)
-        streamer.filter(track=["twitter"])
+        # streamer.filter(track=["twitter"])
     
     elif config.tweet_source == "link":
         auth = tweepy.OAuthHandler(config.oauth_consumer_key, config.oauth_consumer_secret)
