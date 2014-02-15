@@ -4,9 +4,10 @@
 # Assignment 1
 # See LICENSE for details
 
+import logging
 import json
+
 import tweepy
-from collections import OrderedDict
 
 from preprocessor import StopwordRemover
 from preprocessor import SimpleTokenizer
@@ -16,7 +17,10 @@ from preprocessor import VocabNormalizer
 from exception import ClassifierNotTrainedException
 
 class BaseClassifier(tweepy.StreamListener):
-    def __init__(self):
+    def __init__(self, feature_selector):
+        # Set the feature selector.
+        self.feature_selector_class = feature_selector
+
         # Create the objects to prevent repeated constructions.
         self.text_filter = TweetTextFilter()
         self.remover = StopwordRemover()
@@ -26,12 +30,33 @@ class BaseClassifier(tweepy.StreamListener):
         self.normalizer.build_map()
 
         # Initialize some state.
+        self.training_data = dict()
         self.trained = False
 
         super(BaseClassifier, self).__init__()
 
-    def train(self, training_param):
-        raise NotImplementedError('Train not implemented')
+    def train(self, training_sets):
+        for set_name in training_sets:
+            training_file = training_sets[set_name]
+            set_data = list()
+
+            self.logger.info('Reading training set "{0}" ({1})...'.format(
+                set_name, training_file))
+
+            # Read JSON from the set.
+            f = open(training_file, 'r')
+            for line in f:
+                status = json.loads(line)
+                term_vector = self.get_term_vector(status)
+                set_data.append(term_vector)
+
+            self.training_data[set_name] = set_data
+
+        self.logger.info('Reading training sets complete.')
+        self.set_trained(True)
+
+        # Create the feature selector.
+        self.feature_selector = self.feature_selector_class(self.training_data)
 
     def set_trained(self, trained):
         self.trained = trained
@@ -80,75 +105,25 @@ class BaseClassifier(tweepy.StreamListener):
         tokens = self.normalizer.normalize(tokens)
 
 class LocalClassifier(BaseClassifier):
-    def __init__(self):
-        self.training_data = list()
-        super(LocalClassifier, self).__init__()
+    def __init__(self, feature_selector):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        super(LocalClassifier, self).__init__(feature_selector)
 
-    def train(self, training_sets):
-        print training_sets
+    def train(self, training_set):
+        super(LocalClassifier, self).train(training_set)
+        
+        # Local classification: does tweet X belong in category C or not?
+        print self.feature_selector.get_local_features('nus1', 0, include_utility=True)
 
 class GlobalClassifier(BaseClassifier):
-    def __init__(self):
-        # Save some state.
-        self.training_data = list()
-        self.df_threshold = 50
+    def __init__(self, feature_selector):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        super(GlobalClassifier, self).__init__(feature_selector)
 
-        super(GlobalClassifier, self).__init__()
+    def train(self, training_set):
+        super(GlobalClassifier, self).train(training_set)
 
-    def train(self, training_file):
-        # Create some classes first 
-        text_filter = TweetTextFilter()
-
-        # Start reading from the training set.
-        f = open(training_file, 'r')
-        for line in f:
-            status = json.loads(line)
-            term_vector = self.get_term_vector(status)
-            self.training_data.append(term_vector)
-
-        self.set_trained(True)
-
-    def compute_df(self, term):
-        """
-        Computes the document frequency for a term.
-        This is the number of documents containing a particular term.
-        """
-        term = term.lower()
-        df = 0
-
-        for term_vector in self.training_data:
-            if term in term_vector:
-                df += 1
-        
-        return df
-
-    def compute_df_all(self, sort=False, thresholding=True):
-        """
-        Computes the document frequency for all terms.
-
-        If sort is True, this returns a sorted list of tuples. Otherwise, a
-        dict will be returned.
-
-        If thresholding is True, document frequency thresholding is used. To
-        set the threshold, use set_df_threshold. This parameter is ignored if
-        sort is False.
-        """
-        df_map = dict()
-        for term_vector in self.training_data:
-            for term in term_vector:
-                if term not in df_map:
-                    df_map[term] = self.compute_df(term)
-
-        if sort:
-            sorted_df_map = OrderedDict(
-                    sorted(df_map.items(), key=lambda t: t[1], reverse=True))
-            return [(item, sorted_df_map[item]) for item in sorted_df_map
-                    if sorted_df_map[item] > self.df_threshold]
-
-        else:
-            return df_map
-
-    def set_df_threshold(self, threshold):
-        self.df_threshold = threshold
+        # Global classification: which category does tweet X belong to?
+        print self.feature_selector.get_global_features(use_max=False, include_utility=True)
 
 # vim: set ts=4 sw=4 et:

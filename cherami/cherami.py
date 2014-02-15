@@ -13,30 +13,44 @@ import config
 
 from classifier import GlobalClassifier
 from classifier import LocalClassifier
+
 from stream import TweetFileStream
+
+from features import FrequencyBasedFeatureSelector
+from features import ChiSquareFeatureSelector
+
 from exception import CommandLineException
 from exception import ConfigException
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('cherami')
 
 def main():
     # Initialize logging.
     logging.basicConfig(level=logging.INFO)
 
     # Initialize a classifier.
-    global_classifier = GlobalClassifier()
-    global_classifier.train(config.training_file)
-    print global_classifier.compute_df_all(sort=True, thresholding=True)
+    logger.info('Initializing classifier with mode "{0}"...'.format(
+        config.classifier_mode))
 
-    local_classifier = LocalClassifier()
-    local_classifier.train(config.training_sets)
+    if config.classifier_mode == 'global':
+        # classifier = GlobalClassifier(FrequencyBasedFeatureSelector)
+        classifier = GlobalClassifier(ChiSquareFeatureSelector)
+        classifier.train(config.training_sets)
+
+    elif config.classifier_mode == 'local':
+        classifier = LocalClassifier(ChiSquareFeatureSelector)
+        classifier.train(config.training_sets)
+
+    else:
+        raise NotImplementedError('Classifier mode "{0}" not implemented.'.
+                format(config.classifier_mode))
 
     # Determine the tweet source to use.
     logger.info('Using tweet source "{0}".'.format(config.tweet_source))
     if config.tweet_source == "file":
         logger.info('Loading tweets from "{0}"...'.format(config.tweet_file))
-        streamer = TweetFileStream(config.tweet_file, global_classifier)
-        # streamer.filter(track=["twitter"])
+        streamer = TweetFileStream(config.tweet_file, classifier)
+        streamer.filter(track=["twitter"])
     
     elif config.tweet_source == "link":
         auth = tweepy.OAuthHandler(config.oauth_consumer_key, config.oauth_consumer_secret)
@@ -54,14 +68,14 @@ def main():
         logger.info('Retrieving link: {0}'.format(sys.argv[1]))
         api = tweepy.API(auth, parser=tweepy.parsers.RawParser())
         result = api.get_status(status_id)
-        global_classifier.on_data(result)
+        classifier.on_data(result)
 
     elif config.tweet_source == "twitter":
         auth = tweepy.OAuthHandler(config.oauth_consumer_key, config.oauth_consumer_secret)
         auth.set_access_token(config.oauth_token_key, config.oauth_token_secret)
 
         logger.info('Connecting to Twitter Streaming API...')
-        streamer = tweepy.Stream(auth, global_classifier)
+        streamer = tweepy.Stream(auth, classifier)
         streamer.filter(track=["twitter"])
 
     else:

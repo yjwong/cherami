@@ -5,21 +5,17 @@
 # See LICENSE for details
 
 # Classifier mode.
-# local: Requires category names to be specified under training_sets and needs
-#        1 training set for each category.
-# global: Does not require category names to be specified. Uses only one
-#         training_file.
 classifier_mode = 'local'
 
 # Path to the training sets of tweets.
 # This is only used if the classifier mode is local.
-training_sets = [
-    {'nus1': './dataset/training/NUS1.txt'},
-    {'nus2': './dataset/training/NUS2.txt'},
-    {'dbs1': './dataset/training/DBS1.txt'},
-    {'dbs2': './dataset/training/DBS2.txt'},
-    {'starhub': './dataset/training/STARHUB.txt'}
-]
+training_sets = {
+    'nus1': './dataset/training/NUS1.txt',
+    'nus2': './dataset/training/NUS2.txt',
+    'dbs1': './dataset/training/DBS1.txt',
+    'dbs2': './dataset/training/DBS2.txt',
+    'starhub': './dataset/training/STARHUB.txt'
+}
 
 # Path to the training set of tweets.
 # This is only used if the classifier mode is global.
