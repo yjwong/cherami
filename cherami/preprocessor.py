@@ -83,12 +83,20 @@ class StopwordRemover:
 
     def __init__(self):
         StopwordRemover.refcnt += 1
+        logger.debug('refcnt is {0}'.format(StopwordRemover.refcnt))
+
         self.stopword_list = set()
 
     def __del__(self):
         StopwordRemover.refcnt -= 1
+        logger.debug('refcnt is {0}'.format(StopwordRemover.refcnt))
+
         if StopwordRemover.nltk_dir != None and StopwordRemover.refcnt is 0:
+            logger.info('No instance of StopwordRemover remains, removing '
+                'NLTK data directory')
+
             shutil.rmtree(StopwordRemover.nltk_dir)
+            StopwordRemover.nltk_dir = None
 
     def remove_all(self, terms, tweet=None):
         terms = self.remove_rt(terms)
@@ -141,12 +149,13 @@ class StopwordRemover:
             # Create temporary directory for download
             StopwordRemover.nltk_dir = tempfile.mkdtemp(prefix='cherami')
             nltk.data.path = [StopwordRemover.nltk_dir]
+            
+            logger.info('NLTK data directory is "{0}"'
+                .format(StopwordRemover.nltk_dir))
         
         # Check if the NLTK data has already been downloaded.
         if not downloader.is_installed('stopwords'):
-            logger.info('Downloading NLTK stopword data into "{0}"'
-                '...'.format(StopwordRemover.nltk_dir))
-
+            logger.info('Downloading NLTK stopword data...')
             downloader.download('stopwords', StopwordRemover.nltk_dir, True)
             logger.info('NLTK stopword data downloaded.')
 
