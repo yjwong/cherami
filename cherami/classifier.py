@@ -36,7 +36,8 @@ class BaseClassifier(tweepy.StreamListener):
         # Initialize some state.
         self.training_data = dict()
         self.trained = False
-        self.max_features = 128
+        self.max_features = 64
+        self.results = list()
 
         super(BaseClassifier, self).__init__()
 
@@ -67,7 +68,8 @@ class BaseClassifier(tweepy.StreamListener):
         norm = list()
         for feature in features:
             if feature in term_vector:
-                norm.append([feature, term_vector[feature]])
+                # norm.append([feature, term_vector[feature]])
+                norm.append([feature, 1])
             else:
                 norm.append([feature, 0])
         
@@ -119,6 +121,13 @@ class BaseClassifier(tweepy.StreamListener):
             raise ClassifierNotTrainedException('Classifier must be trained '
                     'before use.')
 
+    def publish_result(self, status, categories):
+        self.print_categories(status, categories)
+        self.results.append(categories)
+
+    def get_results(self):
+        return self.results
+
     def print_categories(self, status, categories):
         if not config.quiet_mode:
             if hasattr(status, '__getitem__'):
@@ -128,7 +137,7 @@ class BaseClassifier(tweepy.StreamListener):
 
             print u'{0}: ({1})'.format(categories, status_text)
         else:
-            print categories
+            print '|'.join(categories)
 
 class SVMLocalClassifier(BaseClassifier):
     def __init__(self, feature_selector, tokenizer=NLTKTokenizer):
@@ -187,7 +196,7 @@ class SVMLocalClassifier(BaseClassifier):
             if prediction[0] != 'other':
                 categories.append(prediction[0])
 
-        self.print_categories(status, categories)
+        self.publish_result(status, categories)
 
 class SVMGlobalClassifier(BaseClassifier):
     def __init__(self, feature_selector, tokenizer=NLTKTokenizer):
@@ -223,6 +232,6 @@ class SVMGlobalClassifier(BaseClassifier):
                 self.selected_features)
 
         categories = self.learning_machine.predict(norm_term_vector)
-        self.print_categories(status, categories)
+        self.publish_result(status, categories)
 
 # vim: set ts=4 sw=4 et:

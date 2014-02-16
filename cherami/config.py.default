@@ -28,6 +28,15 @@ training_sets = {
     'starhub': './dataset/training/STARHUB.txt'
 }
 
+# Path to the ground truths.
+groundtruth_sets = {
+    'nus1': './dataset/testing/Groundtruth_NUS1.txt',
+    'nus2': './dataset/testing/Groundtruth_NUS2.txt',
+    'dbs1': './dataset/testing/Groundtruth_DBS1.txt',
+    'dbs2':' ./dataset/testing/Groundtruth_DBS2.txt',
+    'starhub': './dataset/testing/Groundtruth_STARHUB.txt'
+}
+
 # Stopword sources, in order.
 stopword_sources = [
     'nltk:english',
@@ -44,6 +53,9 @@ tweet_source = "file"
 
 # If we are classifying tweets from a file, then these parameters are required.
 tweet_file = "./dataset/testing/TEST.txt"
+
+# Should we perform validation? Only valid for file sources.
+perform_validation = True
 
 # If we are classifying tweets from Twitter's Streaming API, what should we
 # track?
