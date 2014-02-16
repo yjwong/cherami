@@ -31,6 +31,12 @@ class SimpleTokenizer(TweetTokenizer):
     def tokenize(self, tweet):
         return tweet.split()
 
+class NLTKTokenizer(TweetTokenizer):
+    """A tokenizer based on NLTK's wordpunct_tokenize module."""
+
+    def tokenize(self, tweet):
+        return nltk.wordpunct_tokenize(tweet)
+
 class TweetTextFilter:
     """
     A text filter for tweets.

@@ -4,8 +4,20 @@
 # Assignment 1
 # See LICENSE for details
 
+# Magic. Do not touch :P
+from preprocessor import SimpleTokenizer
+from preprocessor import NLTKTokenizer
+from features import FrequencyBasedFeatureSelector
+from features import ChiSquareFeatureSelector
+
 # Classifier mode.
 classifier_mode = 'local'
+
+# Feature selector to use.
+feature_selector = ChiSquareFeatureSelector
+
+# Tokenizer to use.
+tokenizer = NLTKTokenizer
 
 # Path to the training sets of tweets.
 training_sets = {

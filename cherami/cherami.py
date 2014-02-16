@@ -16,9 +16,6 @@ from classifier import SVMLocalClassifier
 
 from stream import TweetFileStream
 
-from features import FrequencyBasedFeatureSelector
-from features import ChiSquareFeatureSelector
-
 from exception import CommandLineException
 from exception import ConfigException
 
@@ -33,11 +30,11 @@ def main():
         config.classifier_mode))
 
     if config.classifier_mode == 'global':
-        classifier = SVMGlobalClassifier(FrequencyBasedFeatureSelector)
+        classifier = SVMGlobalClassifier(config.feature_selector, config.tokenizer)
         classifier.train(config.training_sets)
 
     elif config.classifier_mode == 'local':
-        classifier = SVMLocalClassifier(ChiSquareFeatureSelector)
+        classifier = SVMLocalClassifier(config.feature_selector, config.tokenizer)
         classifier.train(config.training_sets)
 
     else:

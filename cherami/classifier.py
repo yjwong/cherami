@@ -12,15 +12,16 @@ import numpy
 from sklearn import svm
 
 import config
+
 from preprocessor import StopwordRemover
-from preprocessor import SimpleTokenizer
+from preprocessor import NLTKTokenizer
 from preprocessor import TweetTextFilter
 from preprocessor import VocabNormalizer
 
 from exception import ClassifierNotTrainedException
 
 class BaseClassifier(tweepy.StreamListener):
-    def __init__(self, feature_selector):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer):
         # Set the feature selector.
         self.feature_selector_class = feature_selector
 
@@ -28,7 +29,7 @@ class BaseClassifier(tweepy.StreamListener):
         self.text_filter = TweetTextFilter()
         self.remover = StopwordRemover()
         self.remover.build_lists()
-        self.tokenizer = SimpleTokenizer()
+        self.tokenizer = tokenizer()
         self.normalizer = VocabNormalizer()
         self.normalizer.build_map()
 
@@ -130,12 +131,12 @@ class BaseClassifier(tweepy.StreamListener):
             print categories
 
 class SVMLocalClassifier(BaseClassifier):
-    def __init__(self, feature_selector):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.selected_features = dict()
         self.learning_machines = dict()
 
-        super(SVMLocalClassifier, self).__init__(feature_selector)
+        super(SVMLocalClassifier, self).__init__(feature_selector, tokenizer)
 
     def train(self, training_set):
         super(SVMLocalClassifier, self).train(training_set)
@@ -189,9 +190,9 @@ class SVMLocalClassifier(BaseClassifier):
         self.print_categories(status, categories)
 
 class SVMGlobalClassifier(BaseClassifier):
-    def __init__(self, feature_selector):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer):
         self.logger = logging.getLogger(self.__class__.__name__)
-        super(SVMGlobalClassifier, self).__init__(feature_selector)
+        super(SVMGlobalClassifier, self).__init__(feature_selector, tokenizer)
 
     def train(self, training_set):
         super(SVMGlobalClassifier, self).train(training_set)
