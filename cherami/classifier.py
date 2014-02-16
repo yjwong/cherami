@@ -32,11 +32,11 @@ class BaseClassifier(tweepy.StreamListener):
         self.tokenizer = tokenizer()
         self.normalizer = VocabNormalizer()
         self.normalizer.build_map()
+        self.max_features = config.max_features
 
         # Initialize some state.
         self.training_data = dict()
         self.trained = False
-        self.max_features = 64
         self.results = list()
 
         super(BaseClassifier, self).__init__()

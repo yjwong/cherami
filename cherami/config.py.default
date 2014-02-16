@@ -16,6 +16,9 @@ classifier_mode = 'local'
 # Feature selector to use.
 feature_selector = ChiSquareFeatureSelector
 
+# Maximum number of features to select.
+max_features = 64
+
 # Tokenizer to use.
 tokenizer = NLTKTokenizer
 
