@@ -8,7 +8,6 @@
 classifier_mode = 'local'
 
 # Path to the training sets of tweets.
-# This is only used if the classifier mode is local.
 training_sets = {
     'nus1': './dataset/training/NUS1.txt',
     'nus2': './dataset/training/NUS2.txt',
@@ -16,10 +15,6 @@ training_sets = {
     'dbs2': './dataset/training/DBS2.txt',
     'starhub': './dataset/training/STARHUB.txt'
 }
-
-# Path to the training set of tweets.
-# This is only used if the classifier mode is global.
-training_file = './dataset/training/NUS1.txt'
 
 # Stopword sources, in order.
 stopword_sources = [
