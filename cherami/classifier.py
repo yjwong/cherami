@@ -11,6 +11,7 @@ import tweepy
 import numpy
 from sklearn import svm
 
+import config
 from preprocessor import StopwordRemover
 from preprocessor import SimpleTokenizer
 from preprocessor import TweetTextFilter
@@ -117,6 +118,17 @@ class BaseClassifier(tweepy.StreamListener):
             raise ClassifierNotTrainedException('Classifier must be trained '
                     'before use.')
 
+    def print_categories(self, status, categories):
+        if not config.quiet_mode:
+            if hasattr(status, '__getitem__'):
+                status_text = status['text']
+            else:
+                status_text = status.text
+
+            print u'{0}: ({1})'.format(categories, status_text)
+        else:
+            print categories
+
 class SVMLocalClassifier(BaseClassifier):
     def __init__(self, feature_selector):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -132,6 +144,10 @@ class SVMLocalClassifier(BaseClassifier):
         # Since each tweet can belong more than one class, we ask the question
         # for every category C.
         for category in self.training_data:
+            self.logger.info('Performing training for category "{0}"...'.format(
+                category))
+
+            # Each category has its own set of selected features.
             self.selected_features[category] = \
                     self.feature_selector.get_local_features(category, 0,
                         include_utility=False, max_features=self.max_features)
@@ -156,6 +172,8 @@ class SVMLocalClassifier(BaseClassifier):
             learning_machine.fit(term_vectors, class_labels)
             self.learning_machines[category] = learning_machine
 
+        self.logger.info('Training is complete.')
+
     def on_status(self, status):
         term_vector = self.get_term_vector(status)
         categories = list()
@@ -168,7 +186,7 @@ class SVMLocalClassifier(BaseClassifier):
             if prediction[0] != 'other':
                 categories.append(prediction[0])
 
-        print categories
+        self.print_categories(status, categories)
 
 class SVMGlobalClassifier(BaseClassifier):
     def __init__(self, feature_selector):
@@ -202,6 +220,8 @@ class SVMGlobalClassifier(BaseClassifier):
         term_vector = self.get_term_vector(status)
         norm_term_vector = self.normalize_term_vector(term_vector,
                 self.selected_features)
-        print self.learning_machine.predict(norm_term_vector)
+
+        categories = self.learning_machine.predict(norm_term_vector)
+        self.print_categories(status, categories)
 
 # vim: set ts=4 sw=4 et:

@@ -33,6 +33,14 @@ tweet_source = "file"
 # If we are classifying tweets from a file, then these parameters are required.
 tweet_file = "./dataset/testing/TEST.txt"
 
+# If we are classifying tweets from Twitter's Streaming API, what should we
+# track?
+twitter_track = 'nus'
+
+# Should we output stuff quietly? If this is enabled, only the results of the
+# classification will be shown, and not the tweet content.
+quiet_mode = False
+
 # If we are classifying tweets from the actual source, then these API
 # parameters are required.
 oauth_consumer_key = ""

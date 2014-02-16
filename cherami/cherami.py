@@ -49,7 +49,10 @@ def main():
     if config.tweet_source == "file":
         logger.info('Loading tweets from "{0}"...'.format(config.tweet_file))
         streamer = TweetFileStream(config.tweet_file, classifier)
-        streamer.filter(track=["twitter"])
+
+        # Realistically speaking, the track parameter never gets used, but is
+        # required for the API. So we supply it anyway.
+        streamer.filter(track=[config.twitter_track])
     
     elif config.tweet_source == "link":
         auth = tweepy.OAuthHandler(config.oauth_consumer_key, config.oauth_consumer_secret)
@@ -75,7 +78,7 @@ def main():
 
         logger.info('Connecting to Twitter Streaming API...')
         streamer = tweepy.Stream(auth, classifier)
-        streamer.filter(track=["twitter"])
+        streamer.filter(track=[config.twitter_track])
 
     else:
         raise ConfigException("config: invalid tweet source specified")
