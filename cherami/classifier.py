@@ -117,16 +117,16 @@ class BaseClassifier(tweepy.StreamListener):
             raise ClassifierNotTrainedException('Classifier must be trained '
                     'before use.')
 
-class LocalClassifier(BaseClassifier):
+class SVMLocalClassifier(BaseClassifier):
     def __init__(self, feature_selector):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.selected_features = dict()
         self.learning_machines = dict()
 
-        super(LocalClassifier, self).__init__(feature_selector)
+        super(SVMLocalClassifier, self).__init__(feature_selector)
 
     def train(self, training_set):
-        super(LocalClassifier, self).train(training_set)
+        super(SVMLocalClassifier, self).train(training_set)
         
         # Local classification: does tweet X belong in category C or not?
         # Since each tweet can belong more than one class, we ask the question
@@ -153,7 +153,7 @@ class LocalClassifier(BaseClassifier):
 
             # Initialize support vector machine.
             learning_machine = svm.SVC()
-            print learning_machine.fit(term_vectors, class_labels)
+            learning_machine.fit(term_vectors, class_labels)
             self.learning_machines[category] = learning_machine
 
     def on_status(self, status):
@@ -170,16 +170,38 @@ class LocalClassifier(BaseClassifier):
 
         print categories
 
-class GlobalClassifier(BaseClassifier):
+class SVMGlobalClassifier(BaseClassifier):
     def __init__(self, feature_selector):
         self.logger = logging.getLogger(self.__class__.__name__)
-        super(GlobalClassifier, self).__init__(feature_selector)
+        super(SVMGlobalClassifier, self).__init__(feature_selector)
 
     def train(self, training_set):
-        super(GlobalClassifier, self).train(training_set)
+        super(SVMGlobalClassifier, self).train(training_set)
 
         # Global classification: which category does tweet X belong to?
-        print self.feature_selector.get_global_features(use_max=False,
+        self.selected_features = self.feature_selector.get_global_features(
                 include_utility=False, max_features=self.max_features)
+
+        term_vectors = list()
+        class_labels = list()
+        for category_name in self.training_data:
+            category_data = self.training_data[category_name]
+            for term_vector in category_data:
+                term_vector = self.normalize_term_vector(term_vector,
+                        self.selected_features)
+
+                # Create the data required for the SVM classifier.
+                term_vectors.append(term_vector)
+                class_labels.append(category_name)
+
+        # Initialize support vector machine.
+        self.learning_machine = svm.SVC()
+        self.learning_machine.fit(term_vectors, class_labels)
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        norm_term_vector = self.normalize_term_vector(term_vector,
+                self.selected_features)
+        print self.learning_machine.predict(norm_term_vector)
 
 # vim: set ts=4 sw=4 et:

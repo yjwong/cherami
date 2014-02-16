@@ -11,8 +11,8 @@ import logging
 import tweepy
 import config
 
-from classifier import GlobalClassifier
-from classifier import LocalClassifier
+from classifier import SVMGlobalClassifier
+from classifier import SVMLocalClassifier
 
 from stream import TweetFileStream
 
@@ -33,12 +33,11 @@ def main():
         config.classifier_mode))
 
     if config.classifier_mode == 'global':
-        classifier = GlobalClassifier(FrequencyBasedFeatureSelector)
+        classifier = SVMGlobalClassifier(FrequencyBasedFeatureSelector)
         classifier.train(config.training_sets)
 
     elif config.classifier_mode == 'local':
-        classifier = LocalClassifier(ChiSquareFeatureSelector)
-        # classifier = LocalClassifier(FrequencyBasedFeatureSelector)
+        classifier = SVMLocalClassifier(ChiSquareFeatureSelector)
         classifier.train(config.training_sets)
 
     else:
