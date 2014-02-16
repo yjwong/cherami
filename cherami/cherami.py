@@ -33,12 +33,12 @@ def main():
         config.classifier_mode))
 
     if config.classifier_mode == 'global':
-        # classifier = GlobalClassifier(FrequencyBasedFeatureSelector)
-        classifier = GlobalClassifier(ChiSquareFeatureSelector)
+        classifier = GlobalClassifier(FrequencyBasedFeatureSelector)
         classifier.train(config.training_sets)
 
     elif config.classifier_mode == 'local':
         classifier = LocalClassifier(ChiSquareFeatureSelector)
+        # classifier = LocalClassifier(FrequencyBasedFeatureSelector)
         classifier.train(config.training_sets)
 
     else:

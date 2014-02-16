@@ -2,3 +2,4 @@ tweepy==2.1
 iso8601==0.1.8
 nltk==2.0.4
 numpy==1.7.1
+scikit-learn==0.13.1

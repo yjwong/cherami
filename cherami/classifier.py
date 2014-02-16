@@ -8,6 +8,8 @@ import logging
 import json
 
 import tweepy
+import numpy
+from sklearn import svm
 
 from preprocessor import StopwordRemover
 from preprocessor import SimpleTokenizer
@@ -32,6 +34,7 @@ class BaseClassifier(tweepy.StreamListener):
         # Initialize some state.
         self.training_data = dict()
         self.trained = False
+        self.max_features = 128
 
         super(BaseClassifier, self).__init__()
 
@@ -58,6 +61,23 @@ class BaseClassifier(tweepy.StreamListener):
         # Create the feature selector.
         self.feature_selector = self.feature_selector_class(self.training_data)
 
+    def normalize_term_vector(self, term_vector, features):
+        norm = list()
+        for feature in features:
+            if feature in term_vector:
+                norm.append([feature, term_vector[feature]])
+            else:
+                norm.append([feature, 0])
+        
+        array = numpy.array(norm)
+        return array[:,1]
+
+    def set_max_features(self, max_features):
+        self.max_features = max_features
+
+    def get_max_features(self):
+        return self.max_features
+
     def set_trained(self, trained):
         self.trained = trained
 
@@ -66,7 +86,10 @@ class BaseClassifier(tweepy.StreamListener):
 
     def get_term_vector(self, status):
         # Filter out links and mentions first.
-        text = self.text_filter.filter(status['text'])
+        if hasattr(status, '__getitem__'):
+            text = self.text_filter.filter(status['text'])
+        else:
+            text = self.text_filter.filter(status.text)
 
         # Tokenize the text.
         tokens = self.tokenizer.tokenize(text)
@@ -94,26 +117,58 @@ class BaseClassifier(tweepy.StreamListener):
             raise ClassifierNotTrainedException('Classifier must be trained '
                     'before use.')
 
-        # Filter out links and mentions first.
-        text = self.text_filter.filter(status.text)
-
-        # Tokenize the text.
-        tokens = self.tokenizer.tokenize(text)
-        tokens = self.remover.remove_all(tokens)
-
-        # Normalize the vocabulary.
-        tokens = self.normalizer.normalize(tokens)
-
 class LocalClassifier(BaseClassifier):
     def __init__(self, feature_selector):
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.selected_features = dict()
+        self.learning_machines = dict()
+
         super(LocalClassifier, self).__init__(feature_selector)
 
     def train(self, training_set):
         super(LocalClassifier, self).train(training_set)
         
         # Local classification: does tweet X belong in category C or not?
-        print self.feature_selector.get_local_features('nus1', 0, include_utility=True)
+        # Since each tweet can belong more than one class, we ask the question
+        # for every category C.
+        for category in self.training_data:
+            self.selected_features[category] = \
+                    self.feature_selector.get_local_features(category, 0,
+                        include_utility=False, max_features=self.max_features)
+
+            term_vectors = list()
+            class_labels = list()
+            for category_name in self.training_data:
+                category_data = self.training_data[category_name]
+                for term_vector in category_data:
+                    term_vector = self.normalize_term_vector(term_vector,
+                            self.selected_features[category])
+
+                    # Create the data required for the SVM classifier.
+                    term_vectors.append(term_vector)
+                    if category_name == category:
+                        class_labels.append(category_name)
+                    else:
+                        class_labels.append('other')
+
+            # Initialize support vector machine.
+            learning_machine = svm.SVC()
+            print learning_machine.fit(term_vectors, class_labels)
+            self.learning_machines[category] = learning_machine
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        categories = list()
+        for category in self.learning_machines:
+            norm_term_vector = self.normalize_term_vector(term_vector,
+                    self.selected_features[category])
+
+            learning_machine = self.learning_machines[category]
+            prediction = learning_machine.predict(norm_term_vector)
+            if prediction[0] != 'other':
+                categories.append(prediction[0])
+
+        print categories
 
 class GlobalClassifier(BaseClassifier):
     def __init__(self, feature_selector):
@@ -124,6 +179,7 @@ class GlobalClassifier(BaseClassifier):
         super(GlobalClassifier, self).train(training_set)
 
         # Global classification: which category does tweet X belong to?
-        print self.feature_selector.get_global_features(use_max=False, include_utility=True)
+        print self.feature_selector.get_global_features(use_max=False,
+                include_utility=False, max_features=self.max_features)
 
 # vim: set ts=4 sw=4 et:

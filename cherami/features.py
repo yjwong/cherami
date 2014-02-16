@@ -20,10 +20,11 @@ class FeatureSelector(object):
     def get_global_threshold(self):
         return self.global_threshold
 
-    def get_global_features(self, include_utility=False):
+    def get_global_features(self, include_utility=False, max_features=-1):
         raise NotImplementedError('get_global_features not implemented.')
 
-    def get_local_features(self, category, threshold, include_utility=False):
+    def get_local_features(self, category, threshold, include_utility=False,
+            max_features=-1):
         raise NotImplementedError('get_local_features not implemented.')
 
     def get_terms(self):
@@ -52,7 +53,7 @@ class ChiSquareFeatureSelector(FeatureSelector):
         self.global_threshold = 0
         super(ChiSquareFeatureSelector, self).__init__(training_data)
 
-    def get_global_features(self, include_utility=False, use_max=False):
+    def get_global_features(self, include_utility=False, use_max=False, max_features=-1):
         global_chisquares = dict()
         for category_name in self.training_data:
             chisquares = self.compute_chisquare_all(category_name)
@@ -70,20 +71,34 @@ class ChiSquareFeatureSelector(FeatureSelector):
                     else:
                         global_chisquares[term] += chisquares[term] / len(self.training_data)
 
-        chisquares = global_chisquares
+        chisquares = self.sort_chisquares(global_chisquares)
         if include_utility:
-            chisquares = self.sort_chisquares(chisquares)
-            return [(term, chisquares[term]) for term in chisquares if chisquares[term] > self.global_threshold]
+            features = [(term, chisquares[term]) for term in chisquares if
+                    chisquares[term] > self.global_threshold]
         else:
-            return {term for term in chisquares if chisquares[term] > self.global_threshold}
+            features = [term for term in chisquares if
+                    chisquares[term] > self.global_threshold]
 
-    def get_local_features(self, category, threshold, include_utility=False):
+        # Constrain max number of features.
+        if max_features > 0 and len(features) > max_features:
+            return features[:max_features]
+        else:
+            return features
+
+    def get_local_features(self, category, threshold, include_utility=False, max_features=-1):
         chisquares = self.compute_chisquare_all(category)
 
         if include_utility:
-            return [(term, chisquares[term]) for term in chisquares if chisquares[term] > threshold]
+            features = [(term, chisquares[term]) for term in chisquares if
+                    chisquares[term] > threshold]
         else:
-            return {term for term in chisquares if chisquares[term] > threshold}
+            features = [term for term in chisquares if chisquares[term] > threshold]
+
+        # Constrain max number of features.
+        if max_features > 0 and len(features) > max_features:
+            return features[:max_features]
+        else:
+            return features
 
     def compute_chisquare_all(self, category, sort=True):
         chisquares = dict()
@@ -169,13 +184,19 @@ class FrequencyBasedFeatureSelector(FeatureSelector):
         self.global_threshold = 40
         super(FrequencyBasedFeatureSelector, self).__init__(training_data)
 
-    def get_global_features(self, include_utility=False):
+    def get_global_features(self, include_utility=False, max_features=-1):
         df = self.compute_global_df_all(True)
 
         if include_utility:
-            return [(term, df[term]) for term in df if df[term] > self.global_threshold]
+            features = [(term, df[term]) for term in df if df[term] > self.global_threshold]
         else:
-            return {term for term in df if df[term] > self.global_threshold}
+            features = [term for term in df if df[term] > self.global_threshold]
+
+        # Constrain max number of features.
+        if max_features > 0 and len(features) > max_features:
+            return features[:max_features]
+        else:
+            return features
 
     def compute_global_df(self, term):
         df = 0
@@ -208,13 +229,20 @@ class FrequencyBasedFeatureSelector(FeatureSelector):
         else:
             return df
 
-    def get_local_features(self, category, threshold, include_utility=False):
+    def get_local_features(self, category, threshold, include_utility=False,
+            max_features=-1):
         df = self.compute_local_df_all(category)
 
         if include_utility:
-            return [(term, df[term]) for term in df if df[term] > threshold]
+            features = [(term, df[term]) for term in df if df[term] > threshold]
         else:
-            return {term for term in df if df[term] > threshold}
+            features = [term for term in df if df[term] > threshold]
+
+        # Constrain max number of features.
+        if max_features > 0 and len(features) > max_features:
+            return features[:max_features]
+        else:
+            return features
 
     def compute_local_df(self, term, category):
         """
