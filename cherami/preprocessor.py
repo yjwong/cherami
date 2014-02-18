@@ -108,6 +108,7 @@ class StopwordRemover:
         terms = self.remove_rt(terms)
         terms = self.remove(terms)
         terms = self.remove_numbers(terms)
+        terms = self.remove_short(terms)
         return terms
 
     def remove(self, terms):
@@ -115,6 +116,9 @@ class StopwordRemover:
 
     def remove_rt(self, terms):
         return [i for i in terms if not i == 'rt']
+
+    def remove_short(self, terms):
+        return [i for i in terms if len(i) >= 3]
 
     def remove_numbers(self, terms):
         filtered_terms = list()

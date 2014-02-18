@@ -6,10 +6,13 @@
 
 import logging
 import json
+import warnings
 
 import tweepy
 import numpy
-from sklearn import svm
+
+with warnings.catch_warnings():
+    from sklearn import svm
 
 import config
 
@@ -136,8 +139,8 @@ class BaseClassifier(tweepy.StreamListener):
                 status_text = status.text
 
             print u'{0}: ({1})'.format(categories, status_text)
-        else:
-            print '|'.join(categories)
+        # else:
+        #    print '|'.join(categories)
 
 class SVMLocalClassifier(BaseClassifier):
     def __init__(self, feature_selector, tokenizer=NLTKTokenizer):

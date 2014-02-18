@@ -53,31 +53,22 @@ class ChiSquareFeatureSelector(FeatureSelector):
         self.global_threshold = 0
         super(ChiSquareFeatureSelector, self).__init__(training_data)
 
-    def get_global_features(self, include_utility=False, use_max=False, max_features=-1):
+    def get_global_features(self, include_utility=False, max_features=-1):
         global_chisquares = dict()
         for category_name in self.training_data:
             chisquares = self.compute_chisquare_all(category_name)
             for term in chisquares:
-                if use_max:
-                    if term not in global_chisquares:
-                        global_chisquares[term] = chisquares[term]
-                    else:
-                        if chisquares[term] > global_chisquares[term]:
-                            global_chisquares[term] = chisquares[term]
-
+                if term not in global_chisquares:
+                    global_chisquares[term] = chisquares[term]
                 else:
-                    if term not in global_chisquares:
-                        global_chisquares[term] = chisquares[term] / len(self.training_data)
-                    else:
-                        global_chisquares[term] += chisquares[term] / len(self.training_data)
+                    if chisquares[term] > global_chisquares[term]:
+                        global_chisquares[term] = chisquares[term]
 
         chisquares = self.sort_chisquares(global_chisquares)
         if include_utility:
-            features = [(term, chisquares[term]) for term in chisquares if
-                    chisquares[term] > self.global_threshold]
+            features = [(term, chisquares[term]) for term in chisquares]
         else:
-            features = [term for term in chisquares if
-                    chisquares[term] > self.global_threshold]
+            features = [term for term in chisquares]
 
         # Constrain max number of features.
         if max_features > 0 and len(features) > max_features:
