@@ -39,7 +39,8 @@ def main():
     logger.info('Initializing classifier "{0}"...'.format(
         config.classifier.__name__))
 
-    classifier = config.classifier(config.feature_selector, config.tokenizer)
+    classifier = config.classifier(config.feature_selector, config.tokenizer,
+            **config.classifier_options)
     classifier.train(config.training_sets)
 
     # Determine the tweet source to use.

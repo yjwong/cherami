@@ -13,6 +13,7 @@ import numpy
 
 with warnings.catch_warnings():
     from sklearn import svm
+from sklearn import neighbors
 
 import config
 
@@ -24,7 +25,7 @@ from preprocessor import VocabNormalizer
 from exception import ClassifierNotTrainedException
 
 class BaseClassifier(tweepy.StreamListener):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
         # Set the feature selector.
         self.feature_selector_class = feature_selector
 
@@ -152,29 +153,24 @@ class BaseClassifier(tweepy.StreamListener):
                 status_text = status.text
 
             print u'{0}: ({1})'.format(categories, status_text)
-        # else:
-        #    print '|'.join(categories)
 
-class SVMLocalClassifier(BaseClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer):
+class LocalClassifier(BaseClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.selected_features = dict()
-        self.learning_machines = dict()
+        self.term_vectors = dict()
+        self.class_labels = dict()
 
-        super(SVMLocalClassifier, self).__init__(feature_selector, tokenizer)
+        super(LocalClassifier, self).__init__(feature_selector, tokenizer)
 
     def train(self, training_set):
-        super(SVMLocalClassifier, self).train(training_set)
-        
+        super(LocalClassifier, self).train(training_set)
+
         # Local classification: does tweet X belong in category C or not?
         # Since each tweet can belong more than one class, we ask the question
         # for every category C.
         data_count = self.get_data_count()
         for category in self.training_data:
-            self.logger.info('Performing training for category "{0}"...'.format(
-                category))
-
-            # Each category has its own set of selected features.
             self.selected_features[category] = \
                     self.feature_selector.get_local_features(category, 0,
                         include_utility=False, max_features=self.max_features)
@@ -200,34 +196,26 @@ class SVMLocalClassifier(BaseClassifier):
                     
                     term_vector_idx += 1
 
-            # Initialize support vector machine.
-            learning_machine = svm.SVC()
-            learning_machine.fit(term_vectors, class_labels)
-            self.learning_machines[category] = learning_machine
+            self.term_vectors[category] = term_vectors
+            self.class_labels[category] = class_labels
 
-        self.logger.info('Training is complete.')
+    def get_term_vectors(self, category):
+        return self.term_vectors[category]
 
-    def on_status(self, status):
-        term_vector = self.get_term_vector(status)
-        categories = list()
-        for category in self.learning_machines:
-            norm_term_vector = self.normalize_term_vector(term_vector,
-                    self.selected_features[category])
+    def get_class_labels(self, category):
+        return self.class_labels[category]
 
-            learning_machine = self.learning_machines[category]
-            prediction = learning_machine.predict(norm_term_vector)
-            if prediction[0] != 'other':
-                categories.append(prediction[0])
-
-        self.publish_result(status, categories)
-
-class SVMGlobalClassifier(BaseClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer):
+class GlobalClassifier(BaseClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
-        super(SVMGlobalClassifier, self).__init__(feature_selector, tokenizer)
+        self.selected_features = dict()
+        self.term_vectors = dict()
+        self.class_labels = dict()
+
+        super(GlobalClassifier, self).__init__(feature_selector, tokenizer)
 
     def train(self, training_set):
-        super(SVMGlobalClassifier, self).train(training_set)
+        super(GlobalClassifier, self).train(training_set)
 
         # Global classification: which category does tweet X belong to?
         self.selected_features = self.feature_selector.get_global_features(
@@ -249,15 +237,134 @@ class SVMGlobalClassifier(BaseClassifier):
                 class_labels[term_vector_idx] = category_name
                 term_vector_idx += 1
 
+        self.term_vectors = term_vectors
+        self.class_labels = class_labels
+
+    def get_term_vectors(self):
+        return self.term_vectors
+    
+    def get_class_labels(self):
+        return self.class_labels
+
+class SVMLocalClassifier(LocalClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.learning_machines = dict()
+
+        super(SVMLocalClassifier, self).__init__(feature_selector, tokenizer)
+
+    def train(self, training_set):
+        super(SVMLocalClassifier, self).train(training_set)
+        
+        # Local classification: does tweet X belong in category C or not?
+        # Since each tweet can belong more than one class, we ask the question
+        # for every category C.
+        for category in self.training_data:
+            self.logger.info('Performing training for category "{0}"...'.format(
+                category))
+
+            # Initialize support vector machine.
+            learning_machine = svm.SVC()
+            learning_machine.fit(self.get_term_vectors(category),
+                    self.get_class_labels(category))
+            self.learning_machines[category] = learning_machine
+
+        self.logger.info('Training is complete.')
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        categories = list()
+        for category in self.learning_machines:
+            norm_term_vector = self.normalize_term_vector(term_vector,
+                    self.selected_features[category])
+
+            learning_machine = self.learning_machines[category]
+            prediction = learning_machine.predict(norm_term_vector)
+            if prediction[0] != 'other':
+                categories.append(prediction[0])
+
+        self.publish_result(status, categories)
+
+class SVMGlobalClassifier(GlobalClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        super(SVMGlobalClassifier, self).__init__(feature_selector, tokenizer)
+
+    def train(self, training_set):
+        super(SVMGlobalClassifier, self).train(training_set)
+
         # Initialize support vector machine.
         self.learning_machine = svm.SVC()
-        self.learning_machine.fit(term_vectors, class_labels)
+        self.learning_machine.fit(self.get_term_vectors(), 
+                self.get_class_labels())
 
     def on_status(self, status):
         term_vector = self.get_term_vector(status)
         norm_term_vector = self.normalize_term_vector(term_vector,
                 self.selected_features)
 
+        categories = self.learning_machine.predict(norm_term_vector)
+        self.publish_result(status, categories)
+
+class kNNLocalClassifier(LocalClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.learning_machines = dict()
+
+        super(kNNLocalClassifier, self).__init__(feature_selector, tokenizer)
+
+    def train(self, training_set):
+        super(kNNLocalClassifier, self).train(training_set)
+        
+        # Local classification: does tweet X belong in category C or not?
+        # Since each tweet can belong more than one class, we ask the question
+        # for every category C.
+        for category in self.training_data:
+            self.logger.info('Performing training for category "{0}"...'.format(
+                category))
+
+            # Initialize support vector machine.
+            learning_machine = neighbors.KNeighborsClassifier(512,
+                    weights='uniform')
+            learning_machine.fit(self.get_term_vectors(category),
+                    self.get_class_labels(category))
+            self.learning_machines[category] = learning_machine
+
+        self.logger.info('Training is complete.')
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        categories = list()
+        for category in self.learning_machines:
+            norm_term_vector = self.normalize_term_vector(term_vector,
+                    self.selected_features[category])
+
+            learning_machine = self.learning_machines[category]
+            prediction = learning_machine.predict(norm_term_vector)
+            if prediction[0] != 'other':
+                categories.append(prediction[0])
+
+        self.publish_result(status, categories)
+
+class kNNGlobalClassifier(GlobalClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        super(kNNGlobalClassifier, self).__init__(feature_selector, tokenizer)
+
+    def train(self, training_set):
+        super(kNNGlobalClassifier, self).train(training_set)
+        
+        # Initialize kNN classifier.
+        self.learning_machine = neighbors.KNeighborsClassifier(256,
+                weights='uniform')
+        self.learning_machine.fit(self.get_term_vectors(),
+                self.get_class_labels())
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        norm_term_vector = self.normalize_term_vector(term_vector,
+                self.selected_features)
+        
         categories = self.learning_machine.predict(norm_term_vector)
         self.publish_result(status, categories)
 
