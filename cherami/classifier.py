@@ -45,6 +45,10 @@ class BaseClassifier(tweepy.StreamListener):
         super(BaseClassifier, self).__init__()
 
     def train(self, training_sets):
+        # Don't allow retraining.
+        if self.trained:
+            raise RuntimeError('Classifier is already trained')
+
         for set_name in training_sets:
             training_file = training_sets[set_name]
             set_data = list()
@@ -66,6 +70,15 @@ class BaseClassifier(tweepy.StreamListener):
 
         # Create the feature selector.
         self.feature_selector = self.feature_selector_class(self.training_data)
+
+    def get_data_count(self):
+        data_count = 0
+
+        for category_name in self.training_data:
+            category_data = self.training_data[category_name]
+            data_count += len(category_data)
+
+        return data_count
 
     def normalize_term_vector(self, term_vector, features):
         norm = list()
@@ -165,16 +178,19 @@ class SVMLocalClassifier(BaseClassifier):
                     self.feature_selector.get_local_features(category, 0,
                         include_utility=False, max_features=self.max_features)
 
-            term_vectors = list()
+            # Create the list of term vectors.
+            term_vectors = numpy.empty([self.get_data_count(), self.max_features])
+            term_vector_idx = 0
             class_labels = list()
-            for category_name in self.training_data:
-                category_data = self.training_data[category_name]
+            for category_name, category_data in self.training_data.iteritems():
                 for term_vector in category_data:
                     term_vector = self.normalize_term_vector(term_vector,
                             self.selected_features[category])
 
                     # Create the data required for the SVM classifier.
-                    term_vectors.append(term_vector)
+                    term_vectors[term_vector_idx] = term_vector
+                    term_vector_idx += 1
+
                     if category_name == category:
                         class_labels.append(category_name)
                     else:
