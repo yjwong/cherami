@@ -14,6 +14,7 @@ import numpy
 with warnings.catch_warnings():
     from sklearn import svm
 from sklearn import neighbors
+from sklearn import tree
 
 import config
 
@@ -357,6 +358,67 @@ class kNNGlobalClassifier(GlobalClassifier):
         # Initialize kNN classifier.
         self.learning_machine = neighbors.KNeighborsClassifier(256,
                 weights='uniform')
+        self.learning_machine.fit(self.get_term_vectors(),
+                self.get_class_labels())
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        norm_term_vector = self.normalize_term_vector(term_vector,
+                self.selected_features)
+        
+        categories = self.learning_machine.predict(norm_term_vector)
+        self.publish_result(status, categories)
+
+class DecisionTreeLocalClassifier(LocalClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.learning_machines = dict()
+
+        super(DecisionTreeLocalClassifier, self).__init__(feature_selector,
+                tokenizer)
+
+    def train(self, training_set):
+        super(DecisionTreeLocalClassifier, self).train(training_set)
+        
+        # Local classification: does tweet X belong in category C or not?
+        # Since each tweet can belong more than one class, we ask the question
+        # for every category C.
+        for category in self.training_data:
+            self.logger.info('Performing training for category "{0}"...'.format(
+                category))
+
+            # Initialize support vector machine.
+            learning_machine = tree.DecisionTreeClassifier()
+            learning_machine.fit(self.get_term_vectors(category),
+                    self.get_class_labels(category))
+            self.learning_machines[category] = learning_machine
+
+        self.logger.info('Training is complete.')
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        categories = list()
+        for category in self.learning_machines:
+            norm_term_vector = self.normalize_term_vector(term_vector,
+                    self.selected_features[category])
+
+            learning_machine = self.learning_machines[category]
+            prediction = learning_machine.predict(norm_term_vector)
+            if prediction[0] != 'other':
+                categories.append(prediction[0])
+
+        self.publish_result(status, categories)
+
+class DecisionTreeGlobalClassifier(GlobalClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        super(DecisionTreeGlobalClassifier, self).__init__(feature_selector, tokenizer)
+
+    def train(self, training_set):
+        super(DecisionTreeGlobalClassifier, self).train(training_set)
+        
+        # Initialize decision tree classifier.
+        self.learning_machine = tree.DecisionTreeClassifier()
         self.learning_machine.fit(self.get_term_vectors(),
                 self.get_class_labels())
 
