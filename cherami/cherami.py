@@ -36,20 +36,11 @@ def main():
         logging.basicConfig(level=logging.INFO)
 
     # Initialize a classifier.
-    logger.info('Initializing classifier with mode "{0}"...'.format(
-        config.classifier_mode))
+    logger.info('Initializing classifier "{0}"...'.format(
+        config.classifier.__name__))
 
-    if config.classifier_mode == 'global':
-        classifier = SVMGlobalClassifier(config.feature_selector, config.tokenizer)
-        classifier.train(config.training_sets)
-
-    elif config.classifier_mode == 'local':
-        classifier = SVMLocalClassifier(config.feature_selector, config.tokenizer)
-        classifier.train(config.training_sets)
-
-    else:
-        raise NotImplementedError('Classifier mode "{0}" not implemented.'.
-                format(config.classifier_mode))
+    classifier = config.classifier(config.feature_selector, config.tokenizer)
+    classifier.train(config.training_sets)
 
     # Determine the tweet source to use.
     logger.info('Using tweet source "{0}".'.format(config.tweet_source))
