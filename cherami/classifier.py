@@ -15,6 +15,7 @@ with warnings.catch_warnings():
     from sklearn import svm
 from sklearn import neighbors
 from sklearn import tree
+from sklearn import naive_bayes
 
 import config
 
@@ -86,13 +87,15 @@ class BaseClassifier(tweepy.StreamListener):
         norm = list()
         for feature in features:
             if feature in term_vector:
-                # norm.append([feature, term_vector[feature]])
-                norm.append([feature, 1])
+                # norm.append([feature, 1])
+                norm.append(1)
             else:
-                norm.append([feature, 0])
-        
-        array = numpy.array(norm)
-        return array[:,1]
+                # norm.append([feature, 0])
+                norm.append(0)
+       
+        # array = numpy.array(norm)
+        # return array[:,1]
+        return numpy.array(norm)
 
     def set_max_features(self, max_features):
         self.max_features = max_features
@@ -324,7 +327,7 @@ class kNNLocalClassifier(LocalClassifier):
             self.logger.info('Performing training for category "{0}"...'.format(
                 category))
 
-            # Initialize support vector machine.
+            # Initialize kNN classifier.
             learning_machine = neighbors.KNeighborsClassifier(512,
                     weights='uniform')
             learning_machine.fit(self.get_term_vectors(category),
@@ -387,7 +390,7 @@ class DecisionTreeLocalClassifier(LocalClassifier):
             self.logger.info('Performing training for category "{0}"...'.format(
                 category))
 
-            # Initialize support vector machine.
+            # Initialize decision tree classifier.
             learning_machine = tree.DecisionTreeClassifier()
             learning_machine.fit(self.get_term_vectors(category),
                     self.get_class_labels(category))
@@ -419,6 +422,68 @@ class DecisionTreeGlobalClassifier(GlobalClassifier):
         
         # Initialize decision tree classifier.
         self.learning_machine = tree.DecisionTreeClassifier()
+        self.learning_machine.fit(self.get_term_vectors(),
+                self.get_class_labels())
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        norm_term_vector = self.normalize_term_vector(term_vector,
+                self.selected_features)
+        print norm_term_vector
+        
+        categories = self.learning_machine.predict(norm_term_vector)
+        self.publish_result(status, categories)
+
+class NaiveBayesLocalClassifier(LocalClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.learning_machines = dict()
+
+        super(NaiveBayesLocalClassifier, self).__init__(feature_selector,
+                tokenizer)
+
+    def train(self, training_set):
+        super(NaiveBayesLocalClassifier, self).train(training_set)
+        
+        # Local classification: does tweet X belong in category C or not?
+        # Since each tweet can belong more than one class, we ask the question
+        # for every category C.
+        for category in self.training_data:
+            self.logger.info('Performing training for category "{0}"...'.format(
+                category))
+
+            # Initialize naive bayes classifier.
+            learning_machine = naive_bayes.GaussianNB()
+            learning_machine.fit(self.get_term_vectors(category),
+                    self.get_class_labels(category))
+            self.learning_machines[category] = learning_machine
+
+        self.logger.info('Training is complete.')
+
+    def on_status(self, status):
+        term_vector = self.get_term_vector(status)
+        categories = list()
+        for category in self.learning_machines:
+            norm_term_vector = self.normalize_term_vector(term_vector,
+                    self.selected_features[category])
+
+            learning_machine = self.learning_machines[category]
+            prediction = learning_machine.predict(norm_term_vector)
+            if prediction[0] != 'other':
+                categories.append(prediction[0])
+
+        self.publish_result(status, categories)
+
+class NaiveBayesGlobalClassifier(GlobalClassifier):
+    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        super(NaiveBayesGlobalClassifier, self).__init__(feature_selector, tokenizer)
+
+    def train(self, training_set):
+        super(NaiveBayesGlobalClassifier, self).train(training_set)
+        
+        # Initialize naive bayes classifier.
+        self.learning_machine = naive_bayes.GaussianNB()
         self.learning_machine.fit(self.get_term_vectors(),
                 self.get_class_labels())
 
