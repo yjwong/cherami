@@ -169,6 +169,7 @@ class SVMLocalClassifier(BaseClassifier):
         # Local classification: does tweet X belong in category C or not?
         # Since each tweet can belong more than one class, we ask the question
         # for every category C.
+        data_count = self.get_data_count()
         for category in self.training_data:
             self.logger.info('Performing training for category "{0}"...'.format(
                 category))
@@ -179,9 +180,12 @@ class SVMLocalClassifier(BaseClassifier):
                         include_utility=False, max_features=self.max_features)
 
             # Create the list of term vectors.
-            term_vectors = numpy.empty([self.get_data_count(), self.max_features])
+            term_vectors = numpy.empty([data_count, self.max_features])
             term_vector_idx = 0
-            class_labels = list()
+            class_labels = [None] * data_count
+
+            # For each item in the category, classify into the category and
+            # 'others'.
             for category_name, category_data in self.training_data.iteritems():
                 for term_vector in category_data:
                     term_vector = self.normalize_term_vector(term_vector,
@@ -189,12 +193,12 @@ class SVMLocalClassifier(BaseClassifier):
 
                     # Create the data required for the SVM classifier.
                     term_vectors[term_vector_idx] = term_vector
-                    term_vector_idx += 1
-
                     if category_name == category:
-                        class_labels.append(category_name)
+                        class_labels[term_vector_idx] = category_name
                     else:
-                        class_labels.append('other')
+                        class_labels[term_vector_idx] = 'other'
+                    
+                    term_vector_idx += 1
 
             # Initialize support vector machine.
             learning_machine = svm.SVC()
@@ -229,8 +233,11 @@ class SVMGlobalClassifier(BaseClassifier):
         self.selected_features = self.feature_selector.get_global_features(
                 include_utility=False, max_features=self.max_features)
 
-        term_vectors = list()
-        class_labels = list()
+        data_count = self.get_data_count()
+        term_vectors = numpy.empty([data_count, self.max_features])
+        term_vector_idx = 0
+        class_labels = [None] * data_count
+
         for category_name in self.training_data:
             category_data = self.training_data[category_name]
             for term_vector in category_data:
@@ -238,8 +245,9 @@ class SVMGlobalClassifier(BaseClassifier):
                         self.selected_features)
 
                 # Create the data required for the SVM classifier.
-                term_vectors.append(term_vector)
-                class_labels.append(category_name)
+                term_vectors[term_vector_idx] = term_vector
+                class_labels[term_vector_idx] = category_name
+                term_vector_idx += 1
 
         # Initialize support vector machine.
         self.learning_machine = svm.SVC()
