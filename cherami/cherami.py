@@ -13,8 +13,6 @@ import logging
 import numpy
 import tweepy
 
-import config
-
 from classifier import SVMGlobalClassifier
 from classifier import SVMLocalClassifier
 
@@ -29,6 +27,8 @@ from exception import ConfigException
 logger = logging.getLogger('cherami')
 
 def main():
+    import config
+
     # Initialize logging.
     if config.quiet_mode:
         logging.basicConfig(level=logging.CRITICAL)

@@ -17,8 +17,6 @@ from sklearn import neighbors
 from sklearn import tree
 from sklearn import naive_bayes
 
-import config
-
 from preprocessor import StopwordRemover
 from preprocessor import NLTKTokenizer
 from preprocessor import TweetTextFilter
@@ -27,18 +25,20 @@ from preprocessor import VocabNormalizer
 from exception import ClassifierNotTrainedException
 
 class BaseClassifier(tweepy.StreamListener):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         # Set the feature selector.
         self.feature_selector_class = feature_selector
 
         # Create the objects to prevent repeated constructions.
         self.text_filter = TweetTextFilter()
         self.remover = StopwordRemover()
-        self.remover.build_lists()
+        self.remover.build_lists(stopword_sources)
         self.tokenizer = tokenizer()
         self.normalizer = VocabNormalizer()
-        self.normalizer.build_map()
-        self.max_features = config.max_features
+        self.normalizer.build_map(vocab_map_file)
+        self.max_features = 16 
+        self.quiet_mode = True
 
         # Initialize some state.
         self.training_data = dict()
@@ -47,6 +47,29 @@ class BaseClassifier(tweepy.StreamListener):
 
         super(BaseClassifier, self).__init__()
 
+    def train(self, training_tweets, training_labels):
+        # Don't allow retraining.
+        if self.trained:
+            raise RuntimeError('Classifier is already trained')
+
+        for i in range(len(training_tweets)):
+            label = training_labels[i]
+            tweet = training_tweets[i]
+
+            if label not in self.training_data:
+                self.training_data[label] = list()
+
+            tweet = json.loads(unicode(tweet, "ISO-8859-1"))
+            term_vector = self.get_term_vector(tweet)
+            self.training_data[label].append(term_vector)
+
+        self.logger.info('Reading training sets complete.')
+        self.set_trained(True)
+
+        # Create the feature selector.
+        self.feature_selector = self.feature_selector_class(self.training_data)
+
+    """
     def train(self, training_sets):
         # Don't allow retraining.
         if self.trained:
@@ -73,6 +96,7 @@ class BaseClassifier(tweepy.StreamListener):
 
         # Create the feature selector.
         self.feature_selector = self.feature_selector_class(self.training_data)
+    """
 
     def get_data_count(self):
         data_count = 0
@@ -150,7 +174,7 @@ class BaseClassifier(tweepy.StreamListener):
         return self.results
 
     def print_categories(self, status, categories):
-        if not config.quiet_mode:
+        if not self.quiet_mode:
             if hasattr(status, '__getitem__'):
                 status_text = status['text']
             else:
@@ -159,16 +183,18 @@ class BaseClassifier(tweepy.StreamListener):
             print u'{0}: ({1})'.format(categories, status_text)
 
 class LocalClassifier(BaseClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.selected_features = dict()
         self.term_vectors = dict()
         self.class_labels = dict()
 
-        super(LocalClassifier, self).__init__(feature_selector, tokenizer)
+        super(LocalClassifier, self).__init__(feature_selector, tokenizer,
+                stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(LocalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(LocalClassifier, self).train(training_tweets, training_labels)
 
         # Local classification: does tweet X belong in category C or not?
         # Since each tweet can belong more than one class, we ask the question
@@ -210,16 +236,18 @@ class LocalClassifier(BaseClassifier):
         return self.class_labels[category]
 
 class GlobalClassifier(BaseClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.selected_features = dict()
         self.term_vectors = dict()
         self.class_labels = dict()
 
-        super(GlobalClassifier, self).__init__(feature_selector, tokenizer)
+        super(GlobalClassifier, self).__init__(feature_selector, tokenizer,
+                stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(GlobalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(GlobalClassifier, self).train(training_tweets, training_labels)
 
         # Global classification: which category does tweet X belong to?
         self.selected_features = self.feature_selector.get_global_features(
@@ -251,14 +279,16 @@ class GlobalClassifier(BaseClassifier):
         return self.class_labels
 
 class SVMLocalClassifier(LocalClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.learning_machines = dict()
 
-        super(SVMLocalClassifier, self).__init__(feature_selector, tokenizer)
+        super(SVMLocalClassifier, self).__init__(feature_selector, tokenizer,
+                stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(SVMLocalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(SVMLocalClassifier, self).train(training_tweets, training_labels)
         
         # Local classification: does tweet X belong in category C or not?
         # Since each tweet can belong more than one class, we ask the question
@@ -290,12 +320,14 @@ class SVMLocalClassifier(LocalClassifier):
         self.publish_result(status, categories)
 
 class SVMGlobalClassifier(GlobalClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
-        super(SVMGlobalClassifier, self).__init__(feature_selector, tokenizer)
+        super(SVMGlobalClassifier, self).__init__(feature_selector, tokenizer,
+                stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(SVMGlobalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(SVMGlobalClassifier, self).train(training_tweets, training_labels)
 
         # Initialize support vector machine.
         self.learning_machine = svm.SVC()
@@ -311,14 +343,16 @@ class SVMGlobalClassifier(GlobalClassifier):
         self.publish_result(status, categories)
 
 class kNNLocalClassifier(LocalClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.learning_machines = dict()
 
-        super(kNNLocalClassifier, self).__init__(feature_selector, tokenizer)
+        super(kNNLocalClassifier, self).__init__(feature_selector, tokenizer,
+                stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(kNNLocalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(kNNLocalClassifier, self).train(training_tweets, training_labels)
         
         # Local classification: does tweet X belong in category C or not?
         # Since each tweet can belong more than one class, we ask the question
@@ -351,12 +385,14 @@ class kNNLocalClassifier(LocalClassifier):
         self.publish_result(status, categories)
 
 class kNNGlobalClassifier(GlobalClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
-        super(kNNGlobalClassifier, self).__init__(feature_selector, tokenizer)
+        super(kNNGlobalClassifier, self).__init__(feature_selector, tokenizer,
+                stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(kNNGlobalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(kNNGlobalClassifier, self).train(training_tweets, training_labels)
         
         # Initialize kNN classifier.
         self.learning_machine = neighbors.KNeighborsClassifier(256,
@@ -373,15 +409,17 @@ class kNNGlobalClassifier(GlobalClassifier):
         self.publish_result(status, categories)
 
 class DecisionTreeLocalClassifier(LocalClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.learning_machines = dict()
 
         super(DecisionTreeLocalClassifier, self).__init__(feature_selector,
-                tokenizer)
+                tokenizer, stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(DecisionTreeLocalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(DecisionTreeLocalClassifier, self).train(training_tweets,
+                training_labels)
         
         # Local classification: does tweet X belong in category C or not?
         # Since each tweet can belong more than one class, we ask the question
@@ -413,12 +451,15 @@ class DecisionTreeLocalClassifier(LocalClassifier):
         self.publish_result(status, categories)
 
 class DecisionTreeGlobalClassifier(GlobalClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
-        super(DecisionTreeGlobalClassifier, self).__init__(feature_selector, tokenizer)
+        super(DecisionTreeGlobalClassifier, self).__init__(feature_selector,
+                tokenizer, stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(DecisionTreeGlobalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(DecisionTreeGlobalClassifier, self).train(training_tweets,
+                training_labels)
         
         # Initialize decision tree classifier.
         self.learning_machine = tree.DecisionTreeClassifier()
@@ -435,15 +476,17 @@ class DecisionTreeGlobalClassifier(GlobalClassifier):
         self.publish_result(status, categories)
 
 class NaiveBayesLocalClassifier(LocalClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.learning_machines = dict()
 
         super(NaiveBayesLocalClassifier, self).__init__(feature_selector,
-                tokenizer)
+                tokenizer, stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(NaiveBayesLocalClassifier, self).train(training_set)
+    def train(self, training_tweet, training_labels):
+        super(NaiveBayesLocalClassifier, self).train(training_tweet,
+                training_labels)
         
         # Local classification: does tweet X belong in category C or not?
         # Since each tweet can belong more than one class, we ask the question
@@ -475,12 +518,15 @@ class NaiveBayesLocalClassifier(LocalClassifier):
         self.publish_result(status, categories)
 
 class NaiveBayesGlobalClassifier(GlobalClassifier):
-    def __init__(self, feature_selector, tokenizer=NLTKTokenizer, **kwargs):
+    def __init__(self, feature_selector, tokenizer, stopword_sources,
+            vocab_map_file, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
-        super(NaiveBayesGlobalClassifier, self).__init__(feature_selector, tokenizer)
+        super(NaiveBayesGlobalClassifier, self).__init__(feature_selector,
+                tokenizer, stopword_sources, vocab_map_file)
 
-    def train(self, training_set):
-        super(NaiveBayesGlobalClassifier, self).train(training_set)
+    def train(self, training_tweets, training_labels):
+        super(NaiveBayesGlobalClassifier, self).train(training_tweets,
+                training_labels)
         
         # Initialize naive bayes classifier.
         self.learning_machine = naive_bayes.GaussianNB()

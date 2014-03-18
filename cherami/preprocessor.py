@@ -14,7 +14,6 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.downloader import Downloader
 
-import config
 from exception import UnknownStopwordSourceException
 
 logger = logging.getLogger(__name__)
@@ -131,8 +130,8 @@ class StopwordRemover:
 
         return filtered_terms
 
-    def build_lists(self):
-        sources = config.stopword_sources
+    def build_lists(self, stopword_sources):
+        sources = stopword_sources
         for source in sources:
             source_type, source_attrib = source.split(':')
             if source_type == 'nltk':
@@ -183,8 +182,8 @@ class VocabNormalizer:
 
         return terms
 
-    def build_map(self):
-        source = config.vocab_map_file
+    def build_map(self, vocab_map_file):
+        source = vocab_map_file
         f = open(source, 'r')
         for line in f:
             key, value = line.split()
